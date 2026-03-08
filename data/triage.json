@@ -1,0 +1,8 @@
+{
+  "medical_emergency": {
+    "symptoms": "What symptoms are you experiencing?",
+    "consciousness": "Are you feeling dizzy or faint?",
+    "breathing": "Are you having difficulty breathing?",
+    "onset": "When did this start?"
+  }
+}

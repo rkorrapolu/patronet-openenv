@@ -4,10 +4,29 @@ version = "0.1.0"
 description = "OpenEnv RL training environment for emergency response agents"
 requires-python = ">=3.10"
 
-dependencies = ["fastapi", "uvicorn", "pydantic"]
+dependencies = [
+  "openenv-core[core]>=0.2.0",
+  "fastapi",
+  "uvicorn",
+  "pydantic",
+]
+
+[tool.setuptools.packages.find]
+include = ["patronet*"]
+
+[project.scripts]
+server = "patronet.app:main"
 
 [project.optional-dependencies]
 lint = ["ruff", "ty"]
+train = [
+  "trl>=0.15.0",
+  "transformers>=4.45.0",
+  "datasets",
+  "torch>=2.0",
+  "accelerate",
+  "vllm",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["patronet"]

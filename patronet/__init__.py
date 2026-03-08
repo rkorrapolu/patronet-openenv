@@ -1,0 +1,1 @@
+"""Patronet Emergency Environment."""

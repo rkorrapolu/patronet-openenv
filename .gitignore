@@ -35,6 +35,8 @@ token*.txt
 token*.json
 config_*.json
 **/*.bak
+**/phi_*.md
+**/tmp_*.md
 
 # Firebase cache
 .firebase/

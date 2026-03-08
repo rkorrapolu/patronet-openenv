@@ -1,3 +1,16 @@
+---
+title: Patronet Emergency Environment Server
+emoji: 🚨
+colorFrom: red
+colorTo: blue
+sdk: docker
+pinned: false
+app_port: 8000
+base_path: /web
+tags:
+  - openenv
+---
+
 # Patronet OpenEnv
 
 > An OpenEnv RL training environment for emergency response agents
@@ -167,9 +180,9 @@ An episode ends when the crisis is resolved, the agent exceeds its step budget, 
 
 ## Phase 3. Verification
 
-Phase 3 evaluates agent trajectories at three levels of depth. Blackbox evaluation checks the final outcome like was the emergency resolved? Glassbox evaluation checks the full sequence of actions like did the agent follow triage protocol before dispatch?. Whitebox evaluation tests each individual decision in isolation like was dispatching the second unit correct given available information?. These three levels reveal what went wrong, where it happened, why it happened.
+Phase 3 evaluates agent trajectories at three levels of depth. Blackbox evaluation checks the final outcome like was the emergency resolved? Glassbox evaluation checks the full sequence of actions like did the agent follow triage protocol before dispatch? Whitebox evaluation tests each individual decision in isolation like was dispatching the second unit correct given available information? These three levels reveal what went wrong, where it happened, why it happened.
 
-The rubric system uses 9 deterministic verifiers inspired by Pi-bench's trace-based.
+The rubric system uses 9 deterministic verifiers inspired by Pi-bench.
 
 | Pi-bench Dimension | Verifier Coverage | Status |
 | --- | --- | --- |
@@ -289,7 +302,7 @@ For example, a deaf child in silent_mode triggers three guide_victim rows. Silen
 
 ### Environment
 
-The environment team builds the server, models, scenario generator, transition function, and Docker packaging. The server exposes `reset()`, `step(action)`, `state()`, `close()`.
+This includes the server, models, scenario generator and transition function. The server exposes `reset()`, `step(action)`, `state()`, `close()`.
 
 #### Action Model
 
@@ -613,3 +626,26 @@ flowchart TD
   up & down & mid --> specprime
   specprime -->|"Closed loop"| spec
 ```
+
+## Change Log
+
+### 2026-03-08: Level 1 environment and rubric implemented
+
+Implemented the minimum viable environment and rubric for the pinned medical_emergency scenario with Level 1 tools: `triage_assess`, `route_responder`, `wait`.
+
+**What was built:**
+
+`patronet/env.py` contains the `PatronetEnv` class managing the step loop. Each call to `step()` follows the ordering defined in IMPLEMENTATION_PLAN.md D1: check responder arrivals, execute the action, tick deterioration, check budget. The env delegates all reward computation to `patronet/rubric.py` so the scoring rules stay separate from the state machine.
+
+`patronet/rubric.py` contains 4 dense reward functions, each a single boolean check with two return values. Sparse rewards use mutually exclusive precedence: rescued, then partial, then failure. Three verifiers score the trajectory at episode end on [0.0, 1.0].
+
+**Key design decisions made during audit** (documented in IMPLEMENTATION_PLAN.md):
+
+- D1: Step ordering is arrival, action, deterioration, budget. This determines whether rescue or budget exhaustion wins at the boundary.
+- D2: Freeze condition uses strict less-than, matching the README spec. When all remaining actions are `wait`, ETA and deterioration timer decrease at the same rate, so freeze never triggers.
+- D3: Any `triage_assess` resets the deterioration timer regardless of relevance. This creates an emergent strategy where redundant triage at -5 is cheaper than idle penalty at -15.
+- D4: With medium pressure and dense_urban ETA, dispatch must happen by step 3 for rescue within the 20-step budget. The agent cannot ask all 4 triage questions and still rescue.
+
+**Data files:** `data/ontology.json` and `data/triage.json` contain the medical_emergency row only.
+
+**Tests:** 18 tests in `tests/test_env.py` covering observation shape, per-tool rewards, deterioration model, responder arrival, episode boundaries, verifier scores, and a full integration test verifying total reward of +32 for the optimal Level 1 trajectory.

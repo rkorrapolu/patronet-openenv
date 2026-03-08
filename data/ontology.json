@@ -1,0 +1,8 @@
+{
+  "medical_emergency": {
+    "valid_responders": ["medical"],
+    "escalation_level": 2,
+    "time_window": 480,
+    "triage_focus": ["symptoms", "consciousness", "breathing"]
+  }
+}
