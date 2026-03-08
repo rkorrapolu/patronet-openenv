@@ -40,15 +40,23 @@ R(s, a, s') : S \times A \times S \to \mathbb{R}
 $$
 The discount factor $\gamma \in [0, 1)$ controls the weight of future rewards relative to immediate ones. A low $\gamma$ makes the agent favor immediate rewards. A high $\gamma$ makes the agent plan further ahead.
 
-5. **Reinforcement Learning with Verifiable Rewards (RLVR)** replaces learned reward models with programmatic verifiers. These verifiers are simple functions that return deterministic correctness signals, 1.0 for correct or 0.0 for incorrect. This eliminates reward model training and provides reproducible feedback.
+5. **Trajectory** is the complete record of one episode. It captures every state the environment passed through, every action the agent took, and every reward received:
 
-6. **Specification** $d = (\tau, \mathcal{A}, \rho)$ parameterizes the MDP for a given training configuration. The task specification $\tau$ defines crisis scenarios, caller profiles, environmental conditions. The action specification $\mathcal{A}$ defines available tools such as triage classifiers, routing APIs, translation services, silent-mode interfaces. The reward specification $\rho$ defines deterministic scoring rules for policy compliance.
+$$
+h = (s_0, a_0, r_0, s_1, a_1, r_1, \ldots, s_T)
+$$
 
-7. **Prioritized Level Replay (PLR)** is an experience replay method that scores each environment configuration by its estimated learning potential. This project uses rubric score based replay instead. Each environment configuration is scored by the agent's worst verifier score on that scenario. Configurations where the agent scores poorly on any verifier are replayed more often. With probability $p$ the system replays a high-learning-potential scenario from the buffer. With probability $1-p$ it samples a new scenario from the generator.
+An episode starts at `reset()` and ends when the crisis is resolved, the step budget is exceeded, or a critical failure occurs. Verifiers and the OSA algorithm operate on trajectories.
 
-8. **Unsupervised Environment Design (UED)** generates training environments without manual curriculum design. ACCEL (Adversarially Compounding Complexity by Editing Levels) makes small mutations to previously high regret scenarios to compound complexity over time. Regret here means the gap between optimal performance and actual performance on a given scenario.
+6. **Reinforcement Learning with Verifiable Rewards (RLVR)** replaces learned reward models with programmatic verifiers. These verifiers are simple functions that return deterministic correctness signals, 1.0 for correct or 0.0 for incorrect. This eliminates reward model training and provides reproducible feedback.
 
-9. **Zone of Proximal Development** is a concept from educational psychology. It describes the region between what a learner can do independently and what is too difficult. Learning is most effective when tasks fall within this zone. In curriculum learning for RL, this translates to training on scenarios that are challenging but solvable.
+7. **Specification** $d = (\tau, \mathcal{A}, \rho)$ parameterizes the MDP for a given training configuration. The task specification $\tau$ defines crisis scenarios, caller profiles, environmental conditions. The action specification $\mathcal{A}$ defines available tools such as triage classifiers, routing APIs, translation services, silent-mode interfaces. The reward specification $\rho$ defines deterministic scoring rules for policy compliance.
+
+8. **Prioritized Level Replay (PLR)** is an experience replay method that scores each environment configuration by its estimated learning potential. This project uses rubric score based replay instead. Each environment configuration is scored by the agent's worst verifier score on that scenario. Configurations where the agent scores poorly on any verifier are replayed more often. With probability $p$ the system replays a high-learning-potential scenario from the buffer. With probability $1-p$ it samples a new scenario from the generator.
+
+9. **Unsupervised Environment Design (UED)** generates training environments without manual curriculum design. ACCEL (Adversarially Compounding Complexity by Editing Levels) makes small mutations to previously high regret scenarios to compound complexity over time. Regret here means the gap between optimal performance and actual performance on a given scenario.
+
+10. **Zone of Proximal Development** is a concept from educational psychology. It describes the region between what a learner can do independently and what is too difficult. Learning is most effective when tasks fall within this zone. In curriculum learning for RL, this translates to training on scenarios that are challenging but solvable.
 
 ## Phase 1. Specification
 
@@ -183,9 +191,9 @@ $$
 
 across the 9 verifiers for the current batch and compares it against two thresholds $\theta_{\text{success}}$ and $\theta_{\text{failure}}$:
 
-- When $d_{\min} > \theta_{\text{success}}$: the system increases complexity using ACCEL (see Terminology #8), which mutates high-regret scenarios to compound difficulty.
-- When $d_{\min} < \theta_{\text{failure}}$: the system simplifies the bottleneck dimension using SFL (see Terminology #8), which selects levels with positive but imperfect solve rates.
-- When $\theta_{\text{failure}} \leq d_{\min} \leq \theta_{\text{success}}$: the agent is in the zone of proximal development (see Terminology #9). The system makes targeted refinements to the weakest verifier dimension while maintaining overall complexity.
+- When $d_{\min} > \theta_{\text{success}}$: the system increases complexity using ACCEL (see Terminology #9), which mutates high-regret scenarios to compound difficulty.
+- When $d_{\min} < \theta_{\text{failure}}$: the system simplifies the bottleneck dimension using SFL (see Terminology #9), which selects levels with positive but imperfect solve rates.
+- When $\theta_{\text{failure}} \leq d_{\min} \leq \theta_{\text{success}}$: the agent is in the zone of proximal development (see Terminology #10). The system makes targeted refinements to the weakest verifier dimension while maintaining overall complexity.
 
 The updated specification $d'$ feeds back into Phase 1, closing the loop for automatic curriculum generation. This separation ensures that an agent cannot mask poor protocol compliance behind high outcome rewards.
 
@@ -537,40 +545,56 @@ Start with one scenario end-to-end. Expand axes one at a time after the loop clo
 | concurrent_crises | 1 |
 | threat_colocated | false |
 
+## Project Structure
+
+```bash
+patronet-openenv/
+├── README.md
+├── pyproject.toml
+├── Dockerfile
+│
+├── patronet/
+│   ├── __init__.py
+│   ├── spec.py           # Phase 1: TaskSpec, ActionSpec, RewardSpec
+│   ├── env.py            # Phase 2: OpenEnv generator, state, actions
+│   ├── rubric.py         # Phase 3: Rewards and verifiers
+│   └── curriculum.py     # Phase 4: Experience buffer, thresholds
+│
+├── data/
+│   ├── ontology.json     # Crisis ontology table
+│   ├── triage.json       # Crisis questions
+│   ├── guidance.json     # Crisis instructions
+│   └── constraints.json  # Constraint matrix
+│
+└── tests/
+    └── test_smoke.py
+```
+
 ## Architecture
 
 ```mermaid
 flowchart TD
-  spec["Phase 1: Specification-Driven Generation\nd = (τ, A, ρ) defines MDP"]
-  case1["Case 1: Static Task</br>τ fixed, A and ρ scale"]
-  case2["Case 2: Static Action Space</br>A fixed, τ and ρ scale"]
-  case3["Case 3: Static Reward</br>ρ fixed, τ and A scale"]
-  gen["Phase 2: Environment Generation</br>Procedural content generation</br>Docker containers with deterministic seeds"]
-  rollout["Agent Rollout</br>reset → step(action) → reward → repeat</br>GRPOTrainer + vLLM"]
-  trajectory["Trajectory</br>h = (s₀, a₀, r₀, s₁, a₁, r₁, ..., sₜ)"]
+  spec["Phase 1: Specification</br>d = (τ, A, ρ)"]
+  cases["Case 1: fix τ</br>Case 2: fix A</br>Case 3: fix ρ"]
+  gen["Phase 2: Environment Generation"]
+  rollout["Agent Rollout</br>reset → step → reward → repeat"]
+  trajectory["Trajectory</br>(s₀, a₀, r₀, … , sₜ)"]
   eval["Phase 3: Verification</br>Blackbox → Glassbox → Whitebox"]
-  rubric["Rubric Scoring</br>9 deterministic verifiers</br>No LLM judges"]
-  memory["Prioritized Experience Buffer</br>Rubric-score-based replay</br>Per-verifier rolling averages"]
+  rubric["9 Verifiers</br>Deterministic scoring"]
+  buffer["Experience Buffer</br>Replay worst-scoring scenarios"]
   osa["Phase 4: Specification Update</br>OSA Algorithm"]
-  classify["Stage 1: Classify Failures</br>τ-subset | A-subset | ρ-subset"]
-  bottleneck["Stage 2: Identify Bottleneck</br>Highest failure proportion</br>Weakest verifier"]
-  update["Stage 3: Update Specification"]
-  up["d_min > θ_success</br>Increase complexity"]
-  down["d_min < θ_failure</br>Simplify bottleneck"]
-  mid["Between thresholds</br>Refine weakest dimension"]
-  specprime["Updated Specification d'"]
+  classify["Classify failures</br>τ | A | ρ"]
+  bottleneck["Find bottleneck</br>Weakest verifier"]
+  update["Update spec"]
+  up["Score high → harder scenarios"]
+  down["Score low → simpler scenarios"]
+  mid["Score mid → refine weakest"]
+  specprime["Updated spec d'"]
 
-  spec --> case1 & case2 & case3
-  case1 & case2 & case3 --> gen
-  gen --> rollout
-  rollout --> trajectory
-  trajectory --> eval
-  eval --> rubric
-  rubric --> memory
-  memory --> osa
-  osa --> classify
-  classify --> bottleneck
-  bottleneck --> update
+  spec --> cases --> gen
+  gen --> rollout --> trajectory
+  trajectory --> eval --> rubric --> buffer
+  buffer --> osa --> classify --> bottleneck --> update
   update --> up & down & mid
   up & down & mid --> specprime
   specprime -->|"Closed loop"| spec

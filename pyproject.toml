@@ -1,0 +1,69 @@
+[project]
+name = "patronet-openenv"
+version = "0.1.0"
+description = "OpenEnv RL training environment for emergency response agents"
+requires-python = ">=3.10"
+
+dependencies = ["fastapi", "uvicorn", "pydantic"]
+
+[project.optional-dependencies]
+lint = ["ruff", "ty"]
+
+[tool.pytest.ini_options]
+pythonpath = ["patronet"]
+testpaths = ["tests"]
+addopts = "-s -v"
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s - %(levelname)s - %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+
+[tool.ruff]
+indent-width = 2
+line-length = 100
+src = ["patronet"]
+
+[tool.ruff.lint]
+preview = true
+select = [
+  "E",       # pycodestyle
+  "F",       # pyflakes
+  "W",       # pycodestyle warnings
+  "I",       # isort
+  "C",       # flake8-comprehensions
+  "B",       # flake8-bugbear
+  "UP",      # pyupgrade
+  "RUF",     # ruff specific rules
+  "PLW1514", # unspecified-encoding (require encoding in open calls)
+]
+ignore = ["E111", "E114", "E501", "C901", "RUF001", "RUF069", "UP036"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["patronet"]
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"
+line-ending = "auto"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+
+[tool.ty]
+# See: https://docs.astral.sh/ty/
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+# Exclude templates and scripts from type checking
+exclude = ["src/agents/tools/allie-v2/**", "src/agents/tools/leela-interp/**"]
+
+[tool.ty.rules]
+# Ignore missing third-party type stubs
+unresolved-import = "ignore"
+
+[[tool.ty.overrides]]
+# Relax type checking for test files
+include = ["src/tests/**"]
+[tool.ty.overrides.rules]
+invalid-return-type = "ignore"
